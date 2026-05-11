@@ -6,6 +6,20 @@ const FEISHU_WEBHOOK = process.env.FEISHU_WEBHOOK;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+async function insertDeliveryLog({ letterId, attemptNo, result, errorMessage }) {
+  const payload = {
+    letter_id: letterId,
+    attempt_no: attemptNo,
+    result,
+    error_message: errorMessage || null,
+  };
+
+  const { error } = await supabase.from('delivery_logs').insert([payload]);
+  if (error) {
+    throw error;
+  }
+}
+
 exports.handler = async function (event) {
   const CRON_SECRET = process.env.CRON_SECRET;
   const headers = event.headers || {};
@@ -31,8 +45,11 @@ exports.handler = async function (event) {
     }
 
     let processedCount = 0;
+    let failedCount = 0;
 
     for (const letter of letters || []) {
+      const retryCount = Number(letter.retry_count || 0);
+      const attemptNo = retryCount + 1;
       const message = `📬 收到一封来自过去的信：\n\n${letter.content}\n\n---\n写于: ${new Date(letter.created_at).toLocaleString('zh-CN')}`;
 
       try {
@@ -52,22 +69,65 @@ exports.handler = async function (event) {
 
         const { error: updateError } = await supabase
           .from('letters')
-          .update({ status: 'sent' })
+          .update({
+            status: 'sent',
+            sent_at: new Date().toISOString(),
+            last_error: null,
+          })
           .eq('id', letter.id);
 
         if (updateError) {
           throw updateError;
         }
 
+        try {
+          await insertDeliveryLog({
+            letterId: letter.id,
+            attemptNo,
+            result: 'success',
+            errorMessage: null,
+          });
+        } catch (logError) {
+          console.error(`信件 ${letter.id} 成功日志写入失败:`, logError.message);
+        }
+
         processedCount += 1;
       } catch (error) {
+        failedCount += 1;
         console.error(`信件 ${letter.id} 发送失败:`, error.message);
+
+        const { error: updateError } = await supabase
+          .from('letters')
+          .update({
+            retry_count: retryCount + 1,
+            last_error: error.message,
+          })
+          .eq('id', letter.id);
+
+        if (updateError) {
+          console.error(`信件 ${letter.id} 更新重试计数失败:`, updateError.message);
+        }
+
+        try {
+          await insertDeliveryLog({
+            letterId: letter.id,
+            attemptNo,
+            result: 'failed',
+            errorMessage: error.message,
+          });
+        } catch (logError) {
+          console.error(`信件 ${letter.id} 失败日志写入失败:`, logError.message);
+        }
       }
     }
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ success: true, processed: processedCount }),
+      body: JSON.stringify({
+        success: true,
+        processed: processedCount,
+        failed: failedCount,
+      }),
     };
   } catch (error) {
     return {

@@ -12,6 +12,9 @@ function App() {
   const [content, setContent] = useState('');
   const [targetTime, setTargetTime] = useState('');
   const [letters, setLetters] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [logsError, setLogsError] = useState('');
+  const [activeTab, setActiveTab] = useState('letters');
   const [loading, setLoading] = useState(false);
 
   const fetchLetters = async () => {
@@ -28,8 +31,27 @@ function App() {
     }
   };
 
+  const fetchLogs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setLogs(data || []);
+      setLogsError('');
+    } catch (error) {
+      console.error('获取投递日志失败:', error);
+      setLogs([]);
+      setLogsError('投递日志表尚未创建，请先执行 Supabase 迁移 SQL。');
+    }
+  };
+
   useEffect(() => {
     fetchLetters();
+    fetchLogs();
     const defaultTime = new Date(Date.now() + 5 * 60000);
     defaultTime.setMinutes(defaultTime.getMinutes() - defaultTime.getTimezoneOffset());
     setTargetTime(defaultTime.toISOString().slice(0, 16));
@@ -53,6 +75,7 @@ function App() {
       
       setContent('');
       fetchLetters();
+      fetchLogs();
       alert('投递成功！');
     } catch (error) {
       console.error('发送失败:', error);
@@ -113,35 +136,88 @@ function App() {
         </div>
 
         <div className="space-y-4">
-          <h2 className="text-xl font-bold text-gray-900 px-2">时光信箱</h2>
-          <div className="space-y-4">
-            {letters.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">信箱还是空的，快去写第一封信吧！</p>
-            ) : (
-              letters.map((letter) => (
-                <div key={letter.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-gray-800 truncate mb-1">{letter.content}</p>
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
-                      <span>创建于: {format(new Date(letter.created_at), 'yyyy-MM-dd HH:mm')}</span>
-                      <span>预计送达: {format(new Date(letter.target_time), 'yyyy-MM-dd HH:mm')}</span>
+          <div className="flex items-center gap-2 px-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('letters')}
+              className={`px-3 py-1 rounded-full text-sm ${activeTab === 'letters' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            >
+              时光信箱
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('logs')}
+              className={`px-3 py-1 rounded-full text-sm ${activeTab === 'logs' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            >
+              投递日志
+            </button>
+          </div>
+
+          {activeTab === 'letters' && (
+            <div className="space-y-4">
+              {letters.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">信箱还是空的，快去写第一封信吧！</p>
+              ) : (
+                letters.map((letter) => (
+                  <div key={letter.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-gray-800 break-words mb-1">{letter.content}</p>
+                        <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
+                          <span>创建于: {format(new Date(letter.created_at), 'yyyy-MM-dd HH:mm')}</span>
+                          <span>预计送达: {format(new Date(letter.target_time), 'yyyy-MM-dd HH:mm')}</span>
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0">
+                        {letter.status === 'sent' ? (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <CheckCircle className="w-3 h-3" />已送达
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                            <Clock3 className="w-3 h-3" />等待中
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      <span className="mr-4">失败重试次数: {letter.retry_count || 0}</span>
+                      {letter.last_error && <span className="text-red-600">最近错误: {letter.last_error}</span>}
                     </div>
                   </div>
-                  <div className="flex-shrink-0">
-                    {letter.status === 'sent' ? (
-                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <CheckCircle className="w-3 h-3" />已送达
+                ))
+              )}
+            </div>
+          )}
+
+          {activeTab === 'logs' && (
+            <div className="space-y-3">
+              {logsError && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{logsError}</p>
+              )}
+              {logs.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">还没有投递日志。</p>
+              ) : (
+                logs.map((log) => (
+                  <div key={log.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-sm">
+                    <div className="flex flex-wrap items-center gap-3 mb-1">
+                      <span className="font-medium">信件ID: {log.letter_id}</span>
+                      <span>尝试次数: {log.attempt_no}</span>
+                      <span className={log.result === 'success' ? 'text-green-700' : 'text-red-700'}>
+                        结果: {log.result}
                       </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                        <Clock3 className="w-3 h-3" />等待中
-                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      时间: {format(new Date(log.created_at), 'yyyy-MM-dd HH:mm:ss')}
+                    </div>
+                    {log.error_message && (
+                      <div className="text-xs text-red-600 mt-1 break-words">错误: {log.error_message}</div>
                     )}
                   </div>
-                </div>
-              ))
-            )}
-          </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
