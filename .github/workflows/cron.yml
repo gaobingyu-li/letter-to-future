@@ -2,15 +2,15 @@ name: Letter Delivery Cron
 
 on:
   schedule:
-    # 每 5 分钟执行一次，GitHub Actions 的 Cron 语法与标准 Cron 一致
-    - cron: '*/5 * * * *'
+    # 每 1 分钟执行一次
+    - cron: '* * * * *'
   workflow_dispatch: # 允许你在 GitHub Actions 页面手动点击触发测试
 
 jobs:
   trigger-cron:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Vercel Cron Endpoint
+      - name: Ping Netlify Cron Endpoint
         run: |
           curl -X POST ${{ secrets.CRON_URL }} \
           -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \

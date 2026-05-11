@@ -6,6 +6,13 @@ const FEISHU_WEBHOOK = process.env.FEISHU_WEBHOOK;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+function formatBeijingTime(value) {
+  return new Date(value).toLocaleString('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    hour12: false,
+  });
+}
+
 async function insertDeliveryLog({ letterId, attemptNo, result, errorMessage }) {
   const payload = {
     letter_id: letterId,
@@ -50,7 +57,7 @@ exports.handler = async function (event) {
     for (const letter of letters || []) {
       const retryCount = Number(letter.retry_count || 0);
       const attemptNo = retryCount + 1;
-      const message = `📬 收到一封来自过去的信：\n\n${letter.content}\n\n---\n写于: ${new Date(letter.created_at).toLocaleString('zh-CN')}`;
+      const message = `📬 收到一封来自过去的信：\n\n${letter.content}\n\n---\n写于: ${formatBeijingTime(letter.created_at)} (UTC+8)`;
 
       try {
         const response = await fetch(FEISHU_WEBHOOK, {
