@@ -1,68 +1,68 @@
-import React, { useState, useEffect } from 'react'; }
-import { createClient } from '@supabase/supabase-js'; }
-import { Send, Clock, Mail, CheckCircle, Clock3 } from 'lucide-react'; }
-import { format } from 'date-fns'; }
+import React, { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import { Send, Clock, Mail, CheckCircle, Clock3 } from 'lucide-react';
+import { format } from 'date-fns';
 
 // 前端直连 Supabase
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-function App() {}
+function App() {
   const [content, setContent] = useState('');
   const [targetTime, setTargetTime] = useState('');
   const [letters, setLetters] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchLetters = async () => {}
-    try {}
-      const { data, error } = await supabase }
+  const fetchLetters = async () => {
+    try {
+      const { data, error } = await supabase
         .from('letters')
         .select('*')
-        .order('created_at', { ascending: false }); })
+        .order('created_at', { ascending: false });
         
       if (error) throw error;
       setLetters(data || []);
-    } catch (error) {}
+    } catch (error) {
       console.error('获取信件失败:', error);
     }
   };
 
-  useEffect(() => {})
+  useEffect(() => {
     fetchLetters();
     const defaultTime = new Date(Date.now() + 5 * 60000);
     defaultTime.setMinutes(defaultTime.getMinutes() - defaultTime.getTimezoneOffset());
     setTargetTime(defaultTime.toISOString().slice(0, 16));
   }, []);
 
-  const handleSubmit = async (e) => {}
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!content.trim() || !targetTime) {}
+    if (!content.trim() || !targetTime) {
       alert('请填写信件内容和发送时间！');
       return;
     }
 
     setLoading(true);
-    try {}
+    try {
       const isoTime = new Date(targetTime).toISOString();
-      const { error } = await supabase }
+      const { error } = await supabase
         .from('letters')
-        .insert([{ content, target_time: isoTime, status: 'pending' }]); }])
+        .insert([{ content, target_time: isoTime, status: 'pending' }]);
 
       if (error) throw error;
       
       setContent('');
       fetchLetters();
       alert('投递成功！');
-    } catch (error) {}
+    } catch (error) {
       console.error('发送失败:', error);
       alert('发送失败，请重试');
-    } finally {}
+    } finally {
       setLoading(false);
     }
   };
 
-  return ()
+  return (
     <div className="min-h-screen bg-gray-100 py-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="text-center">
@@ -104,7 +104,7 @@ function App() {}
                 disabled={loading}
                 className="w-full sm:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
               >
-                {loading ? '投递中...' : ()}
+                {loading ? '投递中...' : (
                   <><Send className="w-4 h-4" />封好，投递</>
                 )}
               </button>
@@ -115,10 +115,10 @@ function App() {}
         <div className="space-y-4">
           <h2 className="text-xl font-bold text-gray-900 px-2">时光信箱</h2>
           <div className="space-y-4">
-            {letters.length === 0 ? ()}
+            {letters.length === 0 ? (
               <p className="text-gray-500 text-center py-8">信箱还是空的，快去写第一封信吧！</p>
-            ) : ()
-              letters.map((letter) => ())
+            ) : (
+              letters.map((letter) => (
                 <div key={letter.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
                   <div className="flex-1 min-w-0">
                     <p className="text-gray-800 truncate mb-1">{letter.content}</p>
@@ -128,11 +128,11 @@ function App() {}
                     </div>
                   </div>
                   <div className="flex-shrink-0">
-                    {letter.status === 'sent' ? ()}
+                    {letter.status === 'sent' ? (
                       <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                         <CheckCircle className="w-3 h-3" />已送达
                       </span>
-                    ) : ()
+                    ) : (
                       <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
                         <Clock3 className="w-3 h-3" />等待中
                       </span>
