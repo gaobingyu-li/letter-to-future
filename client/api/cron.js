@@ -61,10 +61,35 @@ exports.handler = async function (event) {
             content: { text: message },
           }),
         });
+        const responseText = await response.text();
+        let responseJson = null;
+
+        try {
+          responseJson = responseText ? JSON.parse(responseText) : null;
+        } catch (parseError) {
+          // keep raw text for diagnostics
+        }
 
         if (!response.ok) {
-          const responseText = await response.text();
           throw new Error(`Feishu webhook failed: ${response.status} ${responseText}`);
+        }
+
+        // 飞书机器人常见失败是 HTTP 200 但业务码非 0（如关键词校验失败）
+        const statusCode =
+          responseJson?.StatusCode ??
+          responseJson?.code ??
+          responseJson?.Code ??
+          0;
+        const statusMessage =
+          responseJson?.StatusMessage ??
+          responseJson?.msg ??
+          responseJson?.message ??
+          '';
+
+        if (statusCode !== 0) {
+          throw new Error(
+            `Feishu business error: code=${statusCode}, message=${statusMessage || responseText}`
+          );
         }
 
         const { error: updateError } = await supabase
