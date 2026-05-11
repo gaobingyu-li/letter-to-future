@@ -10,8 +10,17 @@ jobs:
   trigger-cron:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Netlify Cron Endpoint
-        run: |
-          curl -X POST ${{ secrets.CRON_URL }} \
-          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-          -H "Content-Type: application/json"
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Deliver Due Letters
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+        run: node .github/scripts/deliver-letters.mjs
